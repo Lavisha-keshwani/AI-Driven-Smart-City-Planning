@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-ink text-mist font-body antialiased;
+    background-image:
+      radial-gradient(circle at 15% 10%, rgba(76, 201, 192, 0.06), transparent 40%),
+      radial-gradient(circle at 85% 90%, rgba(192, 139, 63, 0.05), transparent 40%);
+    background-attachment: fixed;
+  }
+  ::selection {
+    @apply bg-water/30 text-mist;
+  }
+  :focus-visible {
+    outline: 2px solid #7EE8DC;
+    outline-offset: 2px;
+  }
+}
+
+@layer utilities {
+  .contour-bg {
+    background-image: repeating-radial-gradient(circle at 50% 120%, transparent 0, transparent 38px, rgba(76,201,192,0.07) 39px, transparent 40px);
+  }
+  .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { background: #24444700; border-radius: 4px; }
+}
