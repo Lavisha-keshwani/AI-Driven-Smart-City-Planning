@@ -34,6 +34,7 @@ Four trained models, a deterministic rules engine, and five LangGraph agents ove
 - [Verification](#verification)
 - [Pipelines](#pipelines)
 - [Troubleshooting](#troubleshooting)
+- [Workflows and diagrams](#workflows-and-diagrams)
 - [Documentation](#documentation)
 - [Ethics and responsible use](#ethics-and-responsible-use)
 - [Data sources](#data-sources)
@@ -1091,10 +1092,31 @@ accessibility.
 
 ---
 
+## Workflows and diagrams
+
+The [`workflows/`](workflows/) folder documents how data actually moves through each
+process — what is passed at every stage, in what form, and which component transforms it.
+
+| Document | Covers |
+|---|---|
+| [system-architecture.md](workflows/system-architecture.md) | Architecture at four levels (context, container, component, deployment), the request lifecycle, the LangGraph execution model, caching, and the failure-mode map |
+| [city-planner-dataflow.md](workflows/city-planner-dataflow.md) | Grid cell to recommendation: feature assembly, three models, SHAP, three agents, deterministic conflict detection, guarded synthesis |
+| [building-planner-dataflow.md](workflows/building-planner-dataflow.md) | Plot inputs to costed recommendations: evidence gathering, NASA POWER, the eight rules with their formulas and cited provenance |
+| [water-microplastics-dataflow.md](workflows/water-microplastics-dataflow.md) | City-wide surface-water monitoring, and the polarimetric screening pipeline with its scope boundary |
+| [data-contracts.md](workflows/data-contracts.md) | Every payload shape in one reference |
+
+Diagrams are Mermaid, so GitHub renders them inline. Every data flow is labelled with the
+**kind** of information it carries — measured, predicted, rule-derived or interpreted —
+because keeping those apart is the point of the architecture. All JSON examples were
+captured from a live run, not written by hand.
+
+---
+
 ## Documentation
 
 | Document | Contents |
 |---|---|
+| [workflows/](workflows/) | **Data-flow and architecture diagrams.** One document per process, showing what data moves at each stage and in what form, plus system architecture at four levels. |
 | [docs/architecture.md](docs/architecture.md) | Layers, request flow, the LangGraph graph, state, trade-off logic, degradation |
 | [docs/model_cards/model1_surface_water.md](docs/model_cards/model1_surface_water.md) | Model 1: purpose, features, metrics, per-city performance, limitations |
 | [docs/model_cards/model2_urban_expansion.md](docs/model_cards/model2_urban_expansion.md) | Model 2: forward validation, score definition, thresholds, limitations |
