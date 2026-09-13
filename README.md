@@ -26,6 +26,7 @@ Four trained models, a deterministic rules engine, and five LangGraph agents ove
 - [Status](#status)
 - [Quick start](#quick-start)
 - [Installation](#installation)
+- [Running locally](#running-locally)
 - [Configuration](#configuration)
 - [Project structure](#project-structure)
 - [API](#api)
@@ -328,6 +329,227 @@ npm run dev
 
 Served at **http://localhost:5173**. It expects the backend at
 `http://localhost:8000`; override with `VITE_API_BASE_URL` in `frontend/.env.local`.
+
+---
+
+## Running locally
+
+Everything below assumes you have already done the one-time
+[Installation](#installation). These are the commands for day-to-day use.
+
+### Start the system
+
+The backend and frontend are two long-running processes, so use **two terminals**.
+
+**Terminal 1 — backend**
+
+```bash
+cd backend
+
+# Activate the virtual environment
+source venv/bin/activate            # macOS / Linux / Git Bash
+venv\Scripts\activate               # Windows CMD
+.\venv\Scripts\Activate.ps1         # Windows PowerShell
+
+# Start the API with auto-reload
+uvicorn app.main:app --reload --port 8000
+```
+
+Wait for the startup log to confirm the models loaded:
+
+```
+Model warm-up: 4/4 models loaded, 8/8 datasets present
+LLM: provider=groq model=openai/gpt-oss-120b enabled=True key_configured=True
+Uvicorn running on http://127.0.0.1:8000
+```
+
+**Terminal 2 — frontend**
+
+```bash
+cd frontend
+npm run dev
+```
+
+```
+VITE ready in 412 ms
+Local:   http://localhost:5173/
+```
+
+### Open it
+
+| What | URL |
+|---|---|
+| **The application** | http://localhost:5173 |
+| Interactive API docs (Swagger) | http://localhost:8000/docs |
+| Alternative API docs (ReDoc) | http://localhost:8000/redoc |
+| Health check | http://localhost:8000/health |
+| Model and dataset readiness | http://localhost:8000/api/models/status |
+
+### Confirm it is actually working
+
+```bash
+# Backend is up and every model loaded
+curl http://localhost:8000/health
+
+# Expected: "status":"healthy", "models_loaded":"4/4", "datasets_present":"8/8"
+```
+
+```bash
+# A real prediction for a real grid cell
+curl -X POST http://localhost:8000/api/flood-risk \
+  -H "Content-Type: application/json" \
+  -d '{"grid_id": "Chennai_89281444"}'
+```
+
+```bash
+# The full five-agent pipeline, including the Coordinator's verdict
+curl -X POST http://localhost:8000/api/coordinator \
+  -H "Content-Type: application/json" \
+  -d '{"grid_id": "Chennai_89281444"}'
+```
+
+On Windows PowerShell, use `curl.exe` (not the `curl` alias) or `Invoke-RestMethod`:
+
+```powershell
+curl.exe -X POST http://localhost:8000/api/flood-risk `
+  -H "Content-Type: application/json" `
+  -d '{\"grid_id\": \"Chennai_89281444\"}'
+```
+
+### Stop the system
+
+Press `Ctrl+C` in each terminal. To deactivate the Python environment afterwards:
+
+```bash
+deactivate
+```
+
+### Run the tests
+
+```bash
+# Backend — 207 tests, fully offline, no Groq key needed
+cd backend
+pytest                                  # quiet
+pytest -v                               # verbose
+pytest tests/test_end_to_end.py         # just the full-workflow test
+pytest -k "coordinator or conflict"     # match by name
+
+# Frontend — 65 unit and component tests
+cd frontend
+npm test
+npm run test:watch                      # re-run on change
+```
+
+```bash
+# Live integration tests against real Groq and NASA POWER (opt-in, needs a key)
+cd backend
+SMARTCITY_LIVE_TESTS=1 pytest tests/test_integration_live.py -v
+```
+
+```powershell
+# Same, on Windows PowerShell
+$env:SMARTCITY_LIVE_TESTS = "1"; pytest tests/test_integration_live.py -v
+```
+
+```bash
+# Browser end-to-end — needs BOTH servers running, and Chrome installed
+cd frontend
+npm run test:e2e
+```
+
+Screenshots land in `frontend/e2e/screenshots/`. If Chrome is not at the default
+Windows path, set `CHROME_PATH` first.
+
+### Verify the models against their training runs
+
+These re-score the shipped artifacts and compare against the metrics the training runs
+recorded. They need no servers running.
+
+```bash
+cd backend
+
+# Check every source layer aligns on the shared 1 km grid
+python -m scripts.preprocess.validate_grid_alignment --out build/
+
+# Models 1 and 3: reproduce the published unseen-city holdout metrics
+python -m scripts.evaluation.evaluate_models --model all
+python -m scripts.evaluation.evaluate_models --model flood --out build/
+
+# Model 2: forward validation and per-city spread
+python -m scripts.evaluation.evaluate_urban_expansion --out build/
+
+# Rebuild the Model 2 feature table from its source layers
+python -m scripts.features.build_urban_expansion_features --out build/ --with-target
+```
+
+Each exits non-zero if something fails to reproduce, so they work in CI.
+
+### Lint and build
+
+```bash
+cd frontend
+npm run lint          # oxlint
+npm run build         # production build into dist/
+npm run preview       # serve the production build locally
+```
+
+### Useful variations
+
+**Run on different ports**
+
+```bash
+uvicorn app.main:app --reload --port 9000
+```
+
+Then point the frontend at it — create `frontend/.env.local`:
+
+```env
+VITE_API_BASE_URL=http://localhost:9000
+```
+
+**Run without the LLM** (no Groq key, or to keep responses deterministic)
+
+```env
+# in .env
+LLM_ENABLED=false
+```
+
+Everything still works; agent narratives are generated deterministically and labelled
+`source: "deterministic_fallback"`.
+
+**Expose the backend on your network** (for testing from a phone or another machine)
+
+```bash
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+npm run dev -- --host
+```
+
+Add the frontend's origin to `CORS_ORIGINS` in `.env` so the browser is allowed to call
+the API.
+
+**Run the backend without auto-reload** (slightly faster, for demos)
+
+```bash
+uvicorn app.main:app --port 8000
+```
+
+### Command reference
+
+| Task | Directory | Command |
+|---|---|---|
+| Start backend | `backend` | `uvicorn app.main:app --reload --port 8000` |
+| Start frontend | `frontend` | `npm run dev` |
+| Backend tests | `backend` | `pytest` |
+| Live service tests | `backend` | `SMARTCITY_LIVE_TESTS=1 pytest tests/test_integration_live.py` |
+| Frontend tests | `frontend` | `npm test` |
+| Browser end-to-end | `frontend` | `npm run test:e2e` |
+| Lint | `frontend` | `npm run lint` |
+| Production build | `frontend` | `npm run build` |
+| Validate the grid | `backend` | `python -m scripts.preprocess.validate_grid_alignment` |
+| Verify Models 1 and 3 | `backend` | `python -m scripts.evaluation.evaluate_models --model all` |
+| Verify Model 2 | `backend` | `python -m scripts.evaluation.evaluate_urban_expansion` |
+
+If something does not start, see [Troubleshooting](#troubleshooting).
 
 ---
 
