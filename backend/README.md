@@ -1,81 +1,52 @@
 # SmartCityAI — Backend
 
-FastAPI backend for the Multi-Agent AI Framework. Runs today on rule-based
-stub predictions instead of trained models, so the full API contract, agent
-reasoning, and orchestration logic can be built, tested, and connected to
-the frontend before `models/*.pkl` exist.
+FastAPI backend serving four trained models, a deterministic rules engine, and a
+LangGraph multi-agent layer interpreted by Groq.
 
-## Setup
+See the [project README](../README.md) for installation, configuration and the full API
+reference, and [docs/architecture.md](../docs/architecture.md) for the design.
+
+## Quick start
 
 ```bash
-cd backend
-python3 -m venv venv
-source venv/bin/activate      # Windows: venv\Scripts\activate
+python -m venv venv
+source venv/bin/activate          # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 ```
 
-API docs (interactive): http://localhost:8000/docs
+Docs at http://localhost:8000/docs · readiness at http://localhost:8000/api/models/status
 
-## Endpoints
-
-| Method | Path                        | Matches frontend client.js call |
-|--------|-----------------------------|----------------------------------|
-| GET    | `/api/cities`                | `fetchCities()`                 |
-| GET    | `/api/predictions/{cityId}`  | `fetchCityMetrics(cityId)`      |
-| GET    | `/api/recommendations/{cityId}` | `fetchRecommendations(cityId)` |
-| POST   | `/api/whatif/{cityId}`       | `runWhatIfScenario(cityId, scenario)` |
-
-Response field names are camelCase (via Pydantic aliasing) so they match
-`frontend/src/data/mockData.js` exactly — connecting the two is just
-flipping `USE_MOCK = false` in `frontend/src/api/client.js`.
-
-## Structure
+## Layout
 
 ```
 app/
-├── main.py                    # FastAPI app, CORS, router registration
-├── routers/                   # one file per endpoint group
-│   ├── cities.py
-│   ├── predictions.py
-│   ├── recommendations.py
-│   └── whatif.py
-├── schemas/models.py          # Pydantic request/response models
-├── data/city_data.py          # seeded city metrics (mirrors frontend mock)
-└── services/
-    ├── models/stub_models.py  # placeholders for the 5 trained .pkl models
-    ├── agents/                # water, urban, environment, industry,
-    │                          # citizen, coordinator — rule-based for now
-    ├── agent_pipeline.py       # runs all agents in order for a city
-    └── optimizer.py           # what-if scenario math (stand-in for NSGA-II)
+├── main.py                 app, CORS, error handlers, startup warm-up
+├── core/                   config, errors, grid, logging, building guidelines
+├── routers/                system, water, urban, flood, microplastics, building, agents
+├── schemas/                requests.py, responses.py
+├── services/
+│   ├── models/             registry, feature_store, explain, one module per model
+│   └── building_planner/   nasa_power, site_analyzer, recommendation_engine
+└── agents/                 graph, state, schemas, llm, and the five agents
+scripts/                    download, preprocess, features, evaluation
+tests/                      207 offline tests + 8 opt-in live integration tests
 ```
 
-## What's real vs. what's a stub
+Nothing lives in `main.py` beyond app wiring; every path resolves through
+`app/core/config.py`.
 
-**Real, and won't change when models are trained:**
-- API routes, request/response schemas, CORS setup
-- Agent architecture — five stakeholder agents + coordinator, each reading
-  a shared `predictions` dict and returning `{agent, tone, text}`
-- Orchestration flow: predictions → agents → coordinator → response
+## Tests
 
-**Stubbed, and designed to be swapped in one place:**
-- `services/models/stub_models.py` — each function stands in for one of the
-  five trained models (`urban_growth.pkl`, `water_demand.pkl`, etc). Right
-  now they compute derived stats from seeded data instead of running
-  inference. To wire in a real model: load it once at import time, replace
-  the function body with `MODEL.predict(...)`, and nothing in the agents or
-  routers needs to change — they only ever call these functions.
-- `services/optimizer.py` — currently applies fixed multipliers to mimic
-  the frontend's mock math. This is where NSGA-II / MOEA goes once you have
-  real objective functions to optimize against.
+```bash
+pytest                                            # 207 tests, offline, no Groq key
+SMARTCITY_LIVE_TESTS=1 pytest tests/test_integration_live.py    # real Groq + NASA POWER
+```
 
-## Next steps toward the full spec
+## Evaluation
 
-1. Extract real feature tables from the GEE exports (per the extraction
-   script) and train the 5 models — save as `.pkl` in `models/`
-2. Replace each function body in `stub_models.py` with real inference
-3. Replace `optimizer.py`'s multiplier logic with NSGA-II (e.g. via `pymoo`)
-4. Agent reasoning logic in `services/agents/*.py` can stay largely as-is —
-   the thresholds may need tuning once real prediction distributions are
-   known, but the pattern (read predictions → judge → return recommendation)
-   doesn't change
+```bash
+python -m scripts.evaluation.evaluate_models --model all          # M1/M3 reproduction
+python -m scripts.evaluation.evaluate_urban_expansion --out build/  # M2 forward validation
+python -m scripts.features.build_urban_expansion_features --out build/ --with-target
+```

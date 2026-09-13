@@ -1,0 +1,43 @@
+# ─── Secrets ─────────────────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# ─── Python ──────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+venv/
+.venv/
+env/
+
+# ─── Node ────────────────────────────────────────────────────────────────────
+node_modules/
+dist/
+dist-ssr/
+.vite/
+*.local
+
+# ─── Build and script outputs ────────────────────────────────────────────────
+backend/build/
+backend/data/cache/
+
+# ─── Large model and data artifacts ──────────────────────────────────────────
+# The trained artifacts and their feature tables total ~6.5 GB, so they are
+# distributed alongside the repository rather than committed. README.md documents
+# the expected layout, and GET /api/models/status verifies it at runtime.
+models/
+
+# ─── Editor and OS ───────────────────────────────────────────────────────────
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
