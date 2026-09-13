@@ -202,10 +202,10 @@ wall time against 14.18 s of summed agent work, across three threads.
 | **Sustainable Building Planner** | deterministic rules + NASA POWER | unit-tested arithmetic, cited guidelines |
 | **Agent layer** | LangGraph, 5 agents, Groq | 32 tests incl. concurrency and safety-guard proofs |
 | **FastAPI backend** | 33 endpoints | 66 API tests |
-| **React frontend** | 3 sections, interactive map | 65 unit tests + 23 browser checks |
+| **React frontend** | 3 sections, interactive map | 79 unit tests + 25 browser checks |
 
-**Tests: 207 backend + 65 frontend passing** offline, plus 8 live backend integration
-tests against real Groq and NASA POWER, and 23 browser checks driving the real UI.
+**Tests: 207 backend + 79 frontend passing** offline, plus 8 live backend integration
+tests against real Groq and NASA POWER, and 25 browser checks driving the real UI.
 Models 1 and 3 reproduce their training run's published holdout metrics to four decimal
 places — see [Verification](#verification).
 
@@ -434,7 +434,7 @@ pytest -v                               # verbose
 pytest tests/test_end_to_end.py         # just the full-workflow test
 pytest -k "coordinator or conflict"     # match by name
 
-# Frontend — 65 unit and component tests
+# Frontend — 79 unit and component tests
 cd frontend
 npm test
 npm run test:watch                      # re-run on change
@@ -602,6 +602,19 @@ Thresholds are documented in the model cards and exposed at
 
 ---
 
+### The analysis grid
+
+Each city is analysed as a **25 km radius disc around its centre**, sampled on a 1 km
+grid — which is why the map shows a circle rather than an administrative boundary.
+Cell counts range from 2,089 (Thiruvananthapuram) to 2,956 (Srinagar), 2,414 on
+average, for **108,642 cells** across 45 cities.
+
+The grid comes from `city_grid_1km_metadata.csv` in the project's own Earth Engine
+export (`SmartCityAI_city_boundaries`), and every model is indexed by its `grid_id`,
+so all three layers describe exactly the same squares.
+
+---
+
 ## Project structure
 
 ```
@@ -653,7 +666,7 @@ AI-Driven-Smart-City-Planning/
 │   │   ├── lib/domain.js            class -> colour/label/wording, one source of truth
 │   │   ├── components/              ui, map, cell, ai, technical, microplastic, layout
 │   │   └── pages/                   CityPlanner, WaterMicroplastics, BuildingPlanner
-│   ├── e2e/smoke.mjs                23 browser checks against a live backend
+│   ├── e2e/smoke.mjs                25 browser checks against a live backend
 │   └── package.json
 ├── models/                          trained artifacts (~6.5 GB, not committed)
 ├── docs/
@@ -825,8 +838,8 @@ from the real artifacts, and tests skip with a clear reason if an artifact is ab
 
 ```bash
 cd frontend
-npm test                 # 65 unit and component tests
-npm run test:e2e         # 23 browser checks against a live backend
+npm test                 # 79 unit and component tests
+npm run test:e2e         # 25 browser checks against a live backend
 ```
 
 | File | Tests | Covers |
@@ -836,6 +849,7 @@ npm run test:e2e         # 23 browser checks against a live backend
 | `src/components/ui/ui.test.jsx` | 11 | Error display, disclosures, missing-value handling |
 | `src/components/cell/CellSummary.test.jsx` | 13 | The honesty rules (see below) |
 | `src/components/ai/CoordinatorPanel.test.jsx` | 11 | Verdicts, trade-offs, LLM attribution |
+| `src/components/city/CitySelector.test.jsx` | 14 | Stacking above the map, height cap, filtering, a11y |
 
 The component tests assert the project's honesty rules directly: that a LOW flood
 result is shown as *absence of evidence, not safety*; that a GREEN suitability score
@@ -932,13 +946,15 @@ than returning a confident, meaningless answer.
 `npm run test:e2e` verified, in Chrome against the live backend:
 
 ```
-PASS  map renders real grid cells  — 1200 polygons
-PASS  coordinator verdict rendered  — Go ahead with conditions
+PASS  map renders real grid cells  — 2571 polygons
+PASS  whole city grid is drawn, not a truncated half  — 2571 drawn of 2571 analysed
+PASS  city menu renders above the map and fits on screen  — height 337px, fits=true
+PASS  coordinator verdict rendered  — Only with strong protection
 PASS  SHAP attribution panel opens
 PASS  per-city performance table renders
 PASS  microplastic screening matches HMPD label  — label=0 -> "No microplastic signature"
 PASS  recommendations rendered  — 7 recommendations
-23/23 checks passed · No application console errors.
+25/25 checks passed · No application console errors.
 ```
 
 ### Agent parallelism

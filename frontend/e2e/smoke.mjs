@@ -102,11 +102,41 @@ async function main() {
 
     await page.waitForSelector('.leaflet-container', { timeout: 30000 });
     await page.waitForFunction(
-      () => document.querySelectorAll('.leaflet-overlay-pane path').length > 50,
-      { timeout: 60000 },
+      () => document.querySelectorAll('.leaflet-overlay-pane path').length > 2000,
+      { timeout: 90000 },
     );
     const cellCount = await page.locator('.leaflet-overlay-pane path').count();
-    record('map renders real grid cells', cellCount > 50, `${cellCount} polygons`);
+    record('map renders real grid cells', cellCount > 2000, `${cellCount} polygons`);
+
+    // Guards a bug where the map drew only the first N cells. The source file is
+    // ordered south to north, so truncating it cut the grid along a latitude line
+    // and showed half a disc below the city. The rendered count must match the
+    // city's analysed total, and the disc must be vertically symmetric.
+    const coverage = await page.evaluate(() => {
+      const rendered = document.querySelectorAll('.leaflet-overlay-pane path').length;
+      const analysed = [...document.querySelectorAll('dd')]
+        .map((d) => Number(d.textContent.replace(/,/g, '')))
+        .find((n) => Number.isFinite(n) && n > 1000);
+
+      const boxes = [...document.querySelectorAll('.leaflet-overlay-pane path')]
+        .map((p) => p.getBoundingClientRect())
+        .filter((r) => r.width > 0);
+      const ys = boxes.map((r) => r.y + r.height / 2);
+      const xs = boxes.map((r) => r.x + r.width / 2);
+      const midY = (Math.min(...ys) + Math.max(...ys)) / 2;
+      const span = (a) => (a.length ? Math.max(...a) - Math.min(...a) : 0);
+      const widthAbove = span(xs.filter((_, i) => ys[i] < midY));
+      const widthBelow = span(xs.filter((_, i) => ys[i] >= midY));
+      const symmetry = Math.min(widthAbove, widthBelow) / Math.max(widthAbove, widthBelow, 1);
+
+      return { rendered, analysed, symmetry };
+    });
+    record(
+      'whole city grid is drawn, not a truncated half',
+      coverage.rendered === coverage.analysed && coverage.symmetry > 0.9,
+      `${coverage.rendered} drawn of ${coverage.analysed} analysed, ` +
+        `vertical symmetry ${coverage.symmetry.toFixed(2)}`,
+    );
     record('legend renders', (await page.getByText('Legend').count()) > 0);
     await page.screenshot({ path: join(SHOTS, '01-city-planner.png') });
 

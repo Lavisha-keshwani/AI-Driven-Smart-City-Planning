@@ -19,9 +19,12 @@ import CitySelector from '../components/city/CitySelector';
 import { getCities, getCityLayer, getMetrics, runCoordinator } from '../api/client';
 import { useAction, useAsync } from '../hooks/useAsync';
 
-// Cells rendered per city. The full grid is ~2,500 cells per city; capping keeps
-// the SVG layer responsive on a laptop while still covering the whole urban area.
-const CELL_LIMIT = 1200;
+// The whole city grid is rendered. An earlier version capped this at 1,200 cells,
+// which silently showed only PART OF EACH CITY: the source file is ordered
+// south to north, so taking the first N rows cut the grid along a latitude line
+// and left a half-disc sitting below the city centre. Every one of the 45 cities
+// was affected. A cap is only safe if it samples evenly, and at ~2,400 cells per
+// city (2,956 at most) there is no need for one.
 
 export default function CityPlanner() {
   const [city, setCity] = useState(null);
@@ -41,9 +44,9 @@ export default function CityPlanner() {
     useCallback(
       async (signal) => {
         const [urban, flood, water] = await Promise.all([
-          getCityLayer('urban', cityName, { limit: CELL_LIMIT, signal }),
-          getCityLayer('flood', cityName, { limit: CELL_LIMIT, signal }),
-          getCityLayer('water', cityName, { limit: CELL_LIMIT, signal }),
+          getCityLayer('urban', cityName, { signal }),
+          getCityLayer('flood', cityName, { signal }),
+          getCityLayer('water', cityName, { signal }),
         ]);
         return { urban, flood, water };
       },
@@ -142,12 +145,10 @@ export default function CityPlanner() {
                   </dd>
                 </div>
               </dl>
-              {city.grid_cells > CELL_LIMIT && (
-                <p className="text-[10px] text-mist-faint mt-2.5 leading-relaxed">
-                  Showing the first {CELL_LIMIT.toLocaleString()} squares to keep the map
-                  responsive. Every square is still analysed by the API.
-                </p>
-              )}
+              <p className="text-[10px] text-mist-faint mt-2.5 leading-relaxed">
+                Each city is analysed as a 25 km radius around its centre, which is why
+                the grid is circular.
+              </p>
             </Card>
           </aside>
 

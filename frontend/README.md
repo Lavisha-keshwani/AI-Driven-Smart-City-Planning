@@ -97,5 +97,9 @@ One layer renders at a time. Overlapping semi-transparent grids over the same ce
 would make every colour a blend of three, which no legend could explain. All three
 layers are fetched up front, so switching is instant.
 
-Cities are capped at 1,200 rendered cells to keep the SVG layer responsive on a
-laptop; the panel says so, and every cell remains analysable through the API.
+The whole city grid is rendered — around 2,400 cells, 2,956 at most. An earlier
+version capped this at 1,200, which silently showed only part of each city: the
+source file is ordered south to north, so truncating it cut the grid along a
+latitude line and left a half-disc below the city centre. A cap is only safe if it
+samples evenly, and at this size none is needed. The browser smoke test now asserts
+that the rendered cell count matches the city's analysed total.
