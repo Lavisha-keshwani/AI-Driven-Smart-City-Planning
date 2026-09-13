@@ -25,11 +25,12 @@ through an explainable AI decision-support system.
 | **Sustainable Building Planner** | deterministic rules + NASA POWER | unit-tested arithmetic, cited guidelines |
 | **Agent layer** | LangGraph, 5 agents, Groq | 32 tests incl. concurrency and safety-guard proofs |
 | **FastAPI backend** | 33 endpoints | 66 API tests |
-| **React frontend** | legacy dashboard; **rebuild pending** | — |
+| **React frontend** | 3 sections, interactive map | 65 unit tests + 23 browser checks |
 
-**Test suite: 207 passing** offline, plus 8 live integration tests against real Groq and
-NASA POWER. Models 1 and 3 reproduce their training run's published holdout metrics to
-four decimal places — see [Verification](#verification).
+**Tests: 207 backend + 65 frontend passing** offline, plus 8 live backend integration
+tests against real Groq and NASA POWER, and 23 browser checks driving the real UI.
+Models 1 and 3 reproduce their training run's published holdout metrics to four decimal
+places — see [Verification](#verification).
 
 ---
 
@@ -120,11 +121,8 @@ npm install
 npm run dev
 ```
 
-Served at **http://localhost:5173**.
-
-> The frontend is currently the legacy mock-data dashboard and does **not** yet consume
-> the new API. Backend-first was the explicit build order; the React rebuild against these
-> endpoints is the remaining work.
+Served at **http://localhost:5173**. It expects the backend at
+`http://localhost:8000`; override with `VITE_API_BASE_URL` in `frontend/.env.local`.
 
 ---
 
@@ -332,6 +330,34 @@ The suite is offline and deterministic: the LLM is disabled by an autouse fixtur
 NASA POWER is mocked. No test invents data — grid cells, cities and images are discovered
 from the real artifacts, and tests skip with a clear reason if an artifact is absent.
 
+### Frontend
+
+```bash
+cd frontend
+npm test                 # 65 unit and component tests
+npm run test:e2e         # 23 browser checks against a live backend
+```
+
+| File | Tests | Covers |
+|---|---|---|
+| `src/api/client.test.js` | 13 | Error envelopes, aborts, request shapes, uploads |
+| `src/lib/domain.test.js` | 17 | Class metadata completeness, colour consistency, formatting |
+| `src/components/ui/ui.test.jsx` | 11 | Error display, disclosures, missing-value handling |
+| `src/components/cell/CellSummary.test.jsx` | 13 | The honesty rules (see below) |
+| `src/components/ai/CoordinatorPanel.test.jsx` | 11 | Verdicts, trade-offs, LLM attribution |
+
+The component tests assert the project's honesty rules directly: that a LOW flood
+result is shown as *absence of evidence, not safety*; that a GREEN suitability score
+is described as development pressure rather than approval; that satellite figures are
+labelled as measurements; that a missing value reads "not available" rather than zero;
+and that unavailable SHAP attributions are reported as unavailable rather than
+approximated.
+
+`npm run test:e2e` drives the real UI in Chrome against a running backend and checks
+that the map draws real grid polygons, a cell click runs the whole agent pipeline, the
+microplastic screening agrees with the HMPD ground-truth label, and the building planner
+produces recommendations from live NASA POWER data.
+
 ### Live integration tests
 
 Opt-in, against the real services:
@@ -410,6 +436,20 @@ Verified against HMPD ground truth on 231 labelled particles:
 Hence the API requires all three channels and **rejects** a single-channel upload rather
 than returning a confident, meaningless answer.
 
+### The UI renders real data, not a mock
+
+`npm run test:e2e` verified, in Chrome against the live backend:
+
+```
+PASS  map renders real grid cells  — 1200 polygons
+PASS  coordinator verdict rendered  — Go ahead with conditions
+PASS  SHAP attribution panel opens
+PASS  per-city performance table renders
+PASS  microplastic screening matches HMPD label  — label=0 -> "No microplastic signature"
+PASS  recommendations rendered  — 7 recommendations
+23/23 checks passed · No application console errors.
+```
+
 ### Agent parallelism
 
 `tests/test_agents.py::TestGraph::test_domain_agents_run_concurrently` asserts the three
@@ -455,6 +495,7 @@ extending the work.
 | [docs/model_cards/model3_flood_risk.md](docs/model_cards/model3_flood_risk.md) | Model 3: city-holdout, risk bands, per-city performance, limitations |
 | [docs/model_cards/model4_microplastic.md](docs/model_cards/model4_microplastic.md) | Microplastic: scope disclaimer, input construction, CV metrics |
 | [docs/model_cards/building_planner.md](docs/model_cards/building_planner.md) | Rules, guideline provenance, BEE citation and compliance status |
+| [frontend/README.md](frontend/README.md) | Frontend structure, scripts and design decisions |
 | [backend/scripts/README.md](backend/scripts/README.md) | Pipeline scripts |
 | [backend/scripts/download/README.md](backend/scripts/download/README.md) | Source layers and extending to new cities |
 
@@ -499,21 +540,18 @@ extending the work.
 
 ## Remaining work
 
-1. **React frontend rebuild.** The existing dashboard is the legacy mock-data version.
-   The three sections specified — City Planner (interactive map with GREEN/YELLOW/RED
-   suitability, flood-risk and water layers), Water & Microplastic (monitoring plus image
-   upload), and Sustainable Building Planner (inputs and recommendations) — need building
-   against the endpoints above. The GeoJSON layer endpoints are in place and tested.
-2. **Retrain Model 2 with a declared city split.** Its training run saved no split
+1. **Retrain Model 2 with a declared city split.** Its training run saved no split
    manifest, so its 0.835 accuracy cannot be attributed to a spatial holdout. This is the
    weakest validation evidence among the three geospatial models and the highest-value
    improvement available.
-3. **Per-city thresholds.** Models 1 and 3 apply one global threshold across cities whose
+2. **Per-city thresholds.** Models 1 and 3 apply one global threshold across cities whose
    positive rates vary by an order of magnitude, which is the main driver of their per-city
    variance (Model 1 scores F1 0.00 in Ludhiana, 0.90 in Chennai).
-4. **Groq free-tier token budget.** The tier caps tokens per minute, so a full five-agent
+3. **Groq free-tier token budget.** The tier caps tokens per minute, so a full five-agent
    run can be rate-limited; the pipeline then falls back deterministically and reports it.
    A paid tier or further prompt compaction would remove this.
+4. **Map basemap tiles.** The public OpenStreetMap tile service is used because it needs
+   no API key. For real traffic, host tiles or move to a keyed provider.
 
 Not implemented, and deliberately excluded per the project specification: GRACE,
 groundwater depletion, separate water-demand forecasting, ERA5, and NSGA-II optimisation.

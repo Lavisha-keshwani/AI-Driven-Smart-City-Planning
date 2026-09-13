@@ -55,6 +55,13 @@ recommendation the rules did not produce.
 The response keeps these separated as `model_predictions`, `measured` and `derived`, so a
 reader always knows which is which.
 
+> **Reading the temperature figures.** NASA POWER's climatology reports `T2M_MAX` and
+> `T2M_MIN` as the most extreme temperatures ever observed at a location, not typical
+> daily highs and lows. The planner and the UI therefore label them "record high" and
+> "record low", and the passive-cooling trigger is set against that extreme (40 °C)
+> rather than against an average, which a 32 °C threshold would have made almost
+> universally true across India.
+
 ### NASA POWER service
 
 `app/services/building_planner/nasa_power.py`
@@ -87,7 +94,7 @@ and `guideline_basis`.
 |---|---|---|
 | **Rainwater harvesting** | annual rainfall ≥ 400 mm | `yield_L = roof_area_m² × (rainfall_mm / 1000) × runoff_coefficient × 1000` |
 | **Rooftop solar** | irradiance ≥ 3.5 kWh/m²/day and capacity ≥ 1 kW | `generation_kWh_day = capacity_kW × irradiance × performance_ratio`; capacity = min(roof-limited, demand-matched) |
-| **Passive cooling** | mean temp ≥ 28 °C, or summer max ≥ 32 °C | openable area = floor_area × 0.125; strategy branches on humidity |
+| **Passive cooling** | mean temp ≥ 28 °C, or record high ≥ 40 °C | openable area = floor_area × 0.125; strategy branches on humidity |
 | **Flood resilience** | risk band MODERATE or HIGH | plinth raise 0.45 m (moderate) or 0.75 m (high) |
 | **Green / permeable area** | always | `permeable_m² = (plot − plot × ground_coverage) × permeable_share`; share rises from 0.30 to 0.60 where flood risk is elevated |
 | **Water conservation** | always | `saving_L_day = occupants × lpcd × (fixture_saving + greywater_share)` |
@@ -143,6 +150,7 @@ All parameters live in `app/core/building_guidelines.py`, each tagged with an or
 | Office water demand | 45 L/person/day | guideline | CPHEEO |
 | Roof runoff coefficient | 0.85 | guideline | NBC 2016 |
 | Openable area / floor area | 0.125 | guideline | **Eco-Niwas Samhita** |
+| Record-high cooling trigger | 40 °C | project_assumption | — |
 | Min visible light transmittance | 0.27 | guideline | **Eco-Niwas Samhita** |
 | Cool-roof solar reflectance | 0.70 | guideline | **Eco-Niwas Samhita** |
 | Rooftop area per kW | 10 m²/kW | guideline | MNRE |

@@ -31,6 +31,22 @@ export default {
           muted: '#8FA8A6',
           faint: '#4A6260',
         },
+        // Suitability and risk classes. Chosen to stay distinguishable against
+        // the dark ground and for the common forms of colour-vision deficiency:
+        // they differ in lightness as well as hue, and every map layer also
+        // carries a text label so colour is never the only signal.
+        suitable: {
+          DEFAULT: '#3FBF7F',
+          light: '#6FD9A2',
+        },
+        conditional: {
+          DEFAULT: '#E3A93C',
+          light: '#F0C571',
+        },
+        avoid: {
+          DEFAULT: '#E2583E',
+          light: '#F0836D',
+        },
       },
       fontFamily: {
         display: ['"Space Grotesk"', 'sans-serif'],

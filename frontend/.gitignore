@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# e2e screenshots are build output, not source
+e2e/screenshots/

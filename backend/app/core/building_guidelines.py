@@ -180,10 +180,12 @@ THERMAL = {
         "Mean annual temperature above which passive cooling measures become a "
         "priority rather than an option.",
     ),
-    "high_heat_trigger_c": _rule(
-        32, "degC", "project_assumption", "eco_niwas_samhita",
-        "Mean summer maximum above which envelope insulation and shading should be "
-        "treated as essential.",
+    "record_high_trigger_c": _rule(
+        40, "degC", "project_assumption", "eco_niwas_samhita",
+        "Record high temperature above which envelope insulation and shading should "
+        "be treated as essential. NASA POWER climatology reports T2M_MAX as the "
+        "highest temperature observed, not a typical daily maximum, so this "
+        "threshold is set against that extreme rather than an average.",
     ),
     "high_humidity_trigger_pct": _rule(
         65, "%", "project_assumption", "eco_niwas_samhita",

@@ -279,15 +279,16 @@ def _passive_cooling(site: dict, params: dict, skipped: list) -> dict | None:
     humidity = climate.get("humidity_pct")
 
     trigger = bg.value("thermal", "passive_cooling_trigger_c")
-    high_heat = bg.value("thermal", "high_heat_trigger_c")
+    record_high = bg.value("thermal", "record_high_trigger_c")
     humid_trigger = bg.value("thermal", "high_humidity_trigger_pct")
 
-    if mean_temp < trigger and not (max_temp and max_temp >= high_heat):
+    if mean_temp < trigger and not (max_temp and max_temp >= record_high):
         skipped.append({
             "rule": "Passive cooling",
             "reason": (
-                f"Mean temperature of {mean_temp}degC is below the {trigger}degC trigger, "
-                f"so cooling load is not the dominant concern at this site."
+                f"Mean temperature of {mean_temp}°C is below the {trigger}°C "
+                f"trigger and the record high stays under {record_high}°C, so cooling "
+                f"load is not the dominant concern at this site."
             ),
             "triggering_data": {"temperature_c": mean_temp},
         })
@@ -309,7 +310,7 @@ def _passive_cooling(site: dict, params: dict, skipped: list) -> dict | None:
         measures.append(
             "use evaporative cooling and high thermal mass, which work well in this dry air"
         )
-    if max_temp and float(max_temp) >= high_heat:
+    if max_temp and float(max_temp) >= record_high:
         measures.append("insulate the roof and west wall, the surfaces driving peak heat gain")
 
     openable = bg.value("thermal", "openable_area_share_of_floor")
@@ -317,10 +318,14 @@ def _passive_cooling(site: dict, params: dict, skipped: list) -> dict | None:
         params["floors"]
     )
 
-    priority = HIGH if (max_temp and float(max_temp) >= high_heat) or mean_temp >= 30 else MEDIUM
-    reason = f"Mean annual temperature is {mean_temp}degC"
+    priority = (
+        HIGH if (max_temp and float(max_temp) >= record_high) or mean_temp >= 30 else MEDIUM
+    )
+    reason = f"Mean annual temperature is {mean_temp}°C"
     if max_temp:
-        reason += f", reaching {max_temp}degC at its summer peak"
+        # T2M_MAX is the highest temperature on record, not a typical daily high,
+        # so it is described as such rather than as a summer average.
+        reason += f", with a record high of {max_temp}°C"
     reason += (
         f", and relative humidity averages {humidity}%. "
         if humidity is not None else ". "
@@ -351,6 +356,7 @@ def _passive_cooling(site: dict, params: dict, skipped: list) -> dict | None:
             bg.citation("thermal", "openable_area_share_of_floor"),
             bg.citation("thermal", "cool_roof_solar_reflectance"),
             bg.citation("thermal", "visible_light_transmittance_min"),
+            bg.citation("thermal", "record_high_trigger_c"),
         ],
     }
 

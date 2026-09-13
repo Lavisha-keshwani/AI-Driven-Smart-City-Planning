@@ -294,6 +294,34 @@ backend/
 └── tests/
 ```
 
+## Frontend
+
+```
+frontend/src/
+├── api/client.js        the only module that talks to the backend
+├── hooks/useAsync.js    request state; aborts on dependency change and unmount
+├── lib/domain.js        class -> colour/label/wording, one source of truth
+├── components/
+│   ├── ui/              Card, Badge, Meter, Disclosure, ErrorState, form controls
+│   ├── map/             GridMap (Leaflet + GeoJSON), LayerPicker, MapLegend
+│   ├── cell/            per-model result cards
+│   ├── ai/              coordinator verdict, trade-offs, agent narratives
+│   ├── technical/       SHAP, metrics, per-city performance, raw payload
+│   └── microplastic/    three-channel upload
+└── pages/               CityPlanner, WaterMicroplastics, BuildingPlanner
+```
+
+The interface mirrors the backend's separation of evidence. Each result leads with
+plain language and the measured evidence behind it; the model name, SHAP
+attributions, validation metrics, per-city performance and the raw API payload sit
+behind disclosures. Every AI narrative states whether Groq wrote it or whether it
+was produced deterministically, and why. `lib/domain.js` is the single place that
+maps a class to a colour and a phrase, so the map, legend and panels cannot drift
+apart.
+
+The map renders GeoJSON straight from the layer endpoints — one polygon per
+analysed 1 km cell — so what a user clicks is the same cell the models scored.
+
 ## Performance
 
 | Concern | Measure |
