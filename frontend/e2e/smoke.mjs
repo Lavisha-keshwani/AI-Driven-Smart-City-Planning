@@ -118,6 +118,44 @@ async function main() {
     );
     await page.screenshot({ path: join(SHOTS, '02-flood-layer.png') });
 
+    // The city menu must paint above the map. Leaflet puts its panes at z-index
+    // 400 and its controls at 1000, which previously painted over the dropdown.
+    // Only a real browser can settle this, so it is checked here rather than in
+    // the jsdom tests.
+    await page.locator('button[aria-haspopup="listbox"]').click();
+    await page.waitForTimeout(500);
+    const menuStacking = await page.evaluate(() => {
+      const menu = document.querySelector('[role="listbox"]')?.closest('div.absolute');
+      const map = document.querySelector('.leaflet-container');
+      if (!menu || !map) return { ok: false, why: 'menu or map not found' };
+
+      const rect = menu.getBoundingClientRect();
+      const mapRect = map.getBoundingClientRect();
+      const covered = [];
+      for (const fraction of [0.2, 0.5, 0.85]) {
+        const x = rect.x + rect.width / 2;
+        const y = rect.y + rect.height * fraction;
+        if (y > mapRect.y && y < mapRect.bottom && x > mapRect.x && x < mapRect.right) {
+          const onTop = document.elementFromPoint(x, y);
+          if (onTop && onTop.closest('.leaflet-container')) covered.push(Math.round(y));
+        }
+      }
+      return {
+        ok: covered.length === 0 && rect.bottom <= window.innerHeight,
+        coveredAt: covered,
+        height: Math.round(rect.height),
+        fitsOnScreen: rect.bottom <= window.innerHeight,
+      };
+    });
+    record(
+      'city menu renders above the map and fits on screen',
+      menuStacking.ok,
+      `height ${menuStacking.height}px, fits=${menuStacking.fitsOnScreen}` +
+        (menuStacking.coveredAt?.length ? `, covered by map at y=${menuStacking.coveredAt}` : ''),
+    );
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+
     // Click a cell -> the full five-agent pipeline.
     await page.locator('.leaflet-overlay-pane path').nth(20).click({ force: true });
     record(

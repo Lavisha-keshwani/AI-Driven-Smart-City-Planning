@@ -104,8 +104,13 @@ export default function GridMap({
     });
   };
 
+  // `isolate` creates a stacking context around the map. Leaflet puts its panes at
+  // z-index 400 and its controls at 1000; without this those values compete with
+  // the rest of the page and paint over things like the open city dropdown.
   return (
-    <div className={`relative rounded-2xl overflow-hidden border border-white/5 ${className}`}>
+    <div
+      className={`relative isolate z-0 rounded-2xl overflow-hidden border border-white/5 ${className}`}
+    >
       <MapContainer
         center={[20.5937, 78.9629]}
         zoom={5}
