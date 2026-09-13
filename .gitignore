@@ -1,43 +1,94 @@
 # ─── Secrets ─────────────────────────────────────────────────────────────────
+# Never commit real credentials. Use .env.example as the template.
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 *.pem
 *.key
-
-# ─── Python ──────────────────────────────────────────────────────────────────
-__pycache__/
-*.py[cod]
-*.egg-info/
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.coverage
-htmlcov/
-venv/
-.venv/
-env/
-
-# ─── Node ────────────────────────────────────────────────────────────────────
-node_modules/
-dist/
-dist-ssr/
-.vite/
-*.local
-
-# ─── Build and script outputs ────────────────────────────────────────────────
-backend/build/
-backend/data/cache/
+*.p12
+credentials.json
+service-account*.json
 
 # ─── Large model and data artifacts ──────────────────────────────────────────
 # The trained artifacts and their feature tables total ~6.5 GB, so they are
 # distributed alongside the repository rather than committed. README.md documents
 # the expected layout, and GET /api/models/status verifies it at runtime.
-models/
+#
+# Written as "models/*" rather than "models/" so Git still descends into the
+# directory and can re-include its .gitignore, which keeps the folder present on
+# a fresh clone.
+models/*
+!models/.gitignore
 
-# ─── Editor and OS ───────────────────────────────────────────────────────────
-.vscode/
+# ─── Python ──────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Test and type-check caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+
+# Notebooks
+.ipynb_checkpoints/
+
+# ─── Node ────────────────────────────────────────────────────────────────────
+node_modules/
+.pnp
+.pnp.js
+dist/
+dist-ssr/
+.vite/
+*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.eslintcache
+
+# ─── Generated output ────────────────────────────────────────────────────────
+backend/build/
+backend/data/cache/
+frontend/e2e/screenshots/
+*.log
+
+# ─── Editors and OS ──────────────────────────────────────────────────────────
+.vscode/*
+!.vscode/extensions.json
 .idea/
+*.swp
+*.swo
+*~
 .DS_Store
 Thumbs.db
-*.swp
+desktop.ini

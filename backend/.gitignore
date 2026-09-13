@@ -1,4 +1,18 @@
-venv
-__pycache__
-*.pyc
+# Backend-specific ignores. The root .gitignore covers the common cases.
+
+# Virtual environment
+venv/
+.venv/
+
+# Local environment overrides (the root .env is the one that is loaded)
 .env
+
+# Script output: evaluation reports, generated feature tables, manifests
+build/
+
+# Cached downloads (NASA POWER responses etc.)
+data/cache/
+
+__pycache__/
+*.py[cod]
+.pytest_cache/

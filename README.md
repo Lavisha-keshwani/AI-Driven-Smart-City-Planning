@@ -2,9 +2,14 @@
 
 **Multi-Agent AI Framework for Sustainable Urban Growth and Water Resource Planning**
 
-Monitor surface water → identify where a city can and cannot expand → assess flood risk →
-screen for microplastics → help citizens design sustainable buildings → combine all of it
-through an explainable AI decision-support system.
+Monitor surface water -> identify where a city can and cannot expand -> assess flood risk
+-> screen for microplastics -> help citizens design sustainable buildings -> combine all of
+it through an explainable AI decision-support system.
+
+Four trained models, a deterministic rules engine, and five LangGraph agents over a shared
+1 km grid covering **45 Indian cities** and **108,642 analysed cells**.
+
+![City Planner](docs/images/01-city-planner.png)
 
 > **Governing principle:** LLM agents **interpret** predictive model outputs; they do not
 > replace the predictive models. Every probability, score and classification comes from a
@@ -14,12 +19,183 @@ through an explainable AI decision-support system.
 
 ---
 
+## Contents
+
+- [What this does](#what-this-does)
+- [Architecture](#architecture)
+- [Status](#status)
+- [Quick start](#quick-start)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Project structure](#project-structure)
+- [API](#api)
+- [Testing](#testing)
+- [Verification](#verification)
+- [Pipelines](#pipelines)
+- [Troubleshooting](#troubleshooting)
+- [Documentation](#documentation)
+- [Ethics and responsible use](#ethics-and-responsible-use)
+- [Data sources](#data-sources)
+- [Remaining work](#remaining-work)
+
+---
+
+## What this does
+
+The system answers one question — **should this place be developed, and on what terms?** —
+by combining four kinds of evidence and refusing to let any one of them dominate.
+
+### 1. City Planner
+
+Pick a city, pick a 1 km square. All three models run for it, five agents interpret the
+results, and a Coordinator reconciles them into one recommendation with its trade-offs
+stated explicitly.
+
+| Layer | Question | Classes |
+|---|---|---|
+| Expansion suitability | Where could the city grow? | GREEN / YELLOW / RED |
+| Flood risk | Where is flooding likely? | LOW / MODERATE / HIGH |
+| Surface water | Where are the water bodies? | water body / none |
+
+![Flood risk layer](docs/images/02-flood-layer.png)
+
+The interesting case is when the layers disagree. A square with **GREEN** expansion
+suitability and **HIGH** flood risk is exactly how flood-exposed development happens, and
+the Coordinator says so rather than averaging it away:
+
+![Assessment](docs/images/03-assessment.png)
+
+### 2. Water & Microplastics
+
+Per-city surface-water monitoring from the Global Surface Water satellite record, plus
+microscopy screening for candidate microplastic particles.
+
+![Water and microplastics](docs/images/05-microplastic.png)
+
+### 3. Sustainable Building Planner
+
+A citizen describes their plot; the system looks up its real flood risk, water conditions,
+rainfall and sunshine, and works out what is worth building in — each recommendation
+carrying the data that triggered it, the arithmetic behind it, and the guideline it cites.
+
+![Building Planner](docs/images/06-building-planner.png)
+
+---
+
+## Architecture
+
+```
+                              REACT FRONTEND
+                                    |
+                                    v
+                                 FASTAPI
+                                    |
+        +---------------------------+---------------------------+
+        v                           v                           v
+     MODEL 1                     MODEL 2                     MODEL 3
+  Surface Water              Urban Expansion                Flood Risk
+   (XGBoost)                   (LightGBM)                (Random Forest)
+        |                           |                           |
+        +---------------------------+---------------------------+
+                                    |
+                                    v
+                   SUSTAINABLE BUILDING PLANNER
+                  (deterministic rules + NASA POWER)
+                                    |
+                                    v
+                                LANGGRAPH
+                                    |
+        +---------------------------+---------------------------+
+        v                           v                           v
+   Water Agent               Urban Agent                 Flood Agent
+        |                           |                           |
+        +---------------------------+---------------------------+
+                                    v
+                            Building Agent
+                                    |
+                                    v
+                              COORDINATOR
+                                    |
+                                    v
+                               GROQ LLM
+                                    |
+                                    v
+                    FINAL EXPLANATION + TRADE-OFFS
+                          + RECOMMENDATIONS
+```
+
+Responsibilities are strictly separated, and the separation is enforced in code rather
+than by convention:
+
+| Layer | Role | Never does |
+|---|---|---|
+| ML models | prediction | explain itself in prose |
+| Rules engine | deterministic calculation | guess a missing input |
+| LangGraph | orchestration, state, parallelism | decide anything |
+| Groq LLM | interpretation, reasoning, narrative | compute a prediction |
+| Coordinator | synthesis, trade-offs | alter an underlying prediction |
+| FastAPI | transport, validation, errors | hide a failure |
+
+How that is enforced:
+
+| Enforcement | Where |
+|---|---|
+| Agent output schemas have no numeric prediction field | `backend/app/agents/schemas.py` |
+| Model output and agent interpretation occupy separate state keys | `backend/app/agents/state.py` |
+| Evidence is assembled from model output in code, never by the LLM | `backend/app/agents/base.py` |
+| Conflict detection and the headline verdict are deterministic | `backend/app/agents/coordinator_agent.py` |
+| The LLM may tighten a verdict, never loosen it | `backend/app/agents/coordinator_agent.py` |
+| Guardrails are prepended to every prompt | `backend/app/agents/llm.py` |
+
+Full detail in [docs/architecture.md](docs/architecture.md).
+
+### The agent graph
+
+```
+                        START
+                          |
+                          v
+                   validate_input          resolve onto the 1 km grid
+                          |
+          +---------------+---------------+
+          v               v               v
+     water_agent     urban_agent     flood_agent    <- one concurrent superstep
+          |               |               |
+          +---------------+---------------+
+                          v
+                   building_gate           barrier: waits for all three
+                          |
+              +-----------+-----------+
+              v                       v
+       building_agent            coordinator        conditional on building_params
+              |                       |
+              +-----------+-----------+
+                          v
+                         END
+```
+
+The three domain agents genuinely run in parallel, and a test proves it: measured 5.92 s
+wall time against 14.18 s of summed agent work, across three threads.
+
+### Tech stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | React 19, Vite, Tailwind CSS, React Router, Leaflet, Recharts, lucide-react |
+| Backend | FastAPI, Pydantic v2, Uvicorn |
+| ML | scikit-learn, XGBoost, LightGBM, PyTorch, timm, SHAP |
+| Agents | LangGraph, LangChain Core, Groq (`openai/gpt-oss-120b`) |
+| External data | NASA POWER (no API key required) |
+| Tests | pytest, Vitest, Testing Library, Playwright |
+
+---
+
 ## Status
 
 | Component | State | Validation |
 |---|---|---|
 | **Model 1** — Surface Water (XGBoost) | trained, wired, serving | city-holdout; F1 0.627, ROC-AUC 0.861 on 7 unseen cities |
-| **Model 2** — Urban Expansion (LightGBM) | trained, wired, serving | forward validation 2000→2020; accuracy 0.835 |
+| **Model 2** — Urban Expansion (LightGBM) | trained, wired, serving | forward validation 2000-2020; accuracy 0.835 |
 | **Model 3** — Flood Risk (Random Forest) | trained, wired, serving | city-holdout; F1 0.559, ROC-AUC 0.852 on 7 unseen cities |
 | **Microplastic Screening** (ResNet18) | trained, wired, serving | 5-fold CV; accuracy 0.928, ROC-AUC 0.978 |
 | **Sustainable Building Planner** | deterministic rules + NASA POWER | unit-tested arithmetic, cited guidelines |
@@ -31,6 +207,35 @@ through an explainable AI decision-support system.
 tests against real Groq and NASA POWER, and 23 browser checks driving the real UI.
 Models 1 and 3 reproduce their training run's published holdout metrics to four decimal
 places — see [Verification](#verification).
+
+---
+
+## Quick start
+
+With the `models/` artifacts already in place and a Groq API key to hand:
+
+```bash
+# 1. Environment
+cp .env.example .env          # then set GROQ_API_KEY
+
+# 2. Backend  (terminal 1)
+cd backend
+python -m venv venv
+source venv/bin/activate      # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+
+# 3. Frontend (terminal 2)
+cd frontend
+npm install
+npm run dev
+```
+
+Open **http://localhost:5173**. Check readiness at
+**http://localhost:8000/api/models/status** — it should report 4/4 models and 8/8 datasets.
+
+Without a Groq key the system still runs end to end; agents emit deterministic summaries
+labelled `source: "deterministic_fallback"`.
 
 ---
 
@@ -172,6 +377,70 @@ Ollama is **not** a dependency. If the configured Groq model becomes unavailable
 
 Thresholds are documented in the model cards and exposed at
 `/api/flood-risk/thresholds` and `/api/urban-expansion/thresholds`.
+
+---
+
+## Project structure
+
+```
+AI-Driven-Smart-City-Planning/
+├── backend/
+│   ├── app/
+│   │   ├── main.py                  FastAPI app, CORS, error handlers, startup warm-up
+│   │   ├── core/
+│   │   │   ├── config.py            every path and key, env-driven; no hard-coded paths
+│   │   │   ├── errors.py            domain exceptions -> HTTP envelope
+│   │   │   ├── grid.py              the shared 1 km EPSG:4326 analysis grid
+│   │   │   ├── logging_config.py    request-id correlation
+│   │   │   └── building_guidelines.py   cited guideline parameters with provenance
+│   │   ├── routers/                 system, water, urban, flood, microplastics,
+│   │   │                            building, agents
+│   │   ├── schemas/                 requests.py, responses.py
+│   │   ├── services/
+│   │   │   ├── models/
+│   │   │   │   ├── registry.py      singleton model loading
+│   │   │   │   ├── feature_store.py feature-table assembly
+│   │   │   │   ├── explain.py       SHAP attributions
+│   │   │   │   ├── surface_water.py     Model 1
+│   │   │   │   ├── urban_expansion.py   Model 2
+│   │   │   │   ├── flood_risk.py        Model 3
+│   │   │   │   └── microplastic.py      Microplastic screening
+│   │   │   └── building_planner/
+│   │   │       ├── nasa_power.py            NASA POWER service layer
+│   │   │       ├── site_analyzer.py         evidence assembly for a site
+│   │   │       └── recommendation_engine.py deterministic rules
+│   │   └── agents/
+│   │       ├── graph.py             the LangGraph StateGraph
+│   │       ├── state.py             CityState
+│   │       ├── schemas.py           structured output contracts
+│   │       ├── llm.py               Groq client + guardrails
+│   │       ├── base.py              shared agent machinery
+│   │       └── water_agent.py, urban_agent.py, flood_agent.py,
+│   │           building_agent.py, coordinator_agent.py
+│   ├── scripts/
+│   │   ├── download/                source-layer provenance
+│   │   ├── preprocess/              grid-alignment validation
+│   │   ├── features/                feature-table assembly
+│   │   └── evaluation/              validation of the shipped artifacts
+│   ├── tests/                       207 offline + 8 opt-in live tests
+│   └── requirements.txt
+├── frontend/
+│   ├── src/
+│   │   ├── api/client.js            the only module that talks to the backend
+│   │   ├── hooks/useAsync.js        request state; aborts on change and unmount
+│   │   ├── lib/domain.js            class -> colour/label/wording, one source of truth
+│   │   ├── components/              ui, map, cell, ai, technical, microplastic, layout
+│   │   └── pages/                   CityPlanner, WaterMicroplastics, BuildingPlanner
+│   ├── e2e/smoke.mjs                23 browser checks against a live backend
+│   └── package.json
+├── models/                          trained artifacts (~6.5 GB, not committed)
+├── docs/
+│   ├── architecture.md
+│   ├── model_cards/                 one per model, with real metrics and limitations
+│   └── images/                      screenshots used by this README
+├── .env.example
+└── README.md
+```
 
 ---
 
@@ -482,6 +751,105 @@ row counts and feature completeness. Nothing depends on a hand-edited notebook.
 No dataset needs downloading to run or evaluate this project: the processed feature tables
 ship with the artifacts. `scripts/download/README.md` records provenance for anyone
 extending the work.
+
+---
+
+## Troubleshooting
+
+### `/health` reports `degraded`, or fewer than 4/4 models
+
+Check `GET /api/models/status`. It names each artifact, whether the file is present, and
+which config key points at it.
+
+```json
+{
+  "models": {
+    "model3_flood_risk": {
+      "loaded": false,
+      "artifact_present": false,
+      "artifact": "BEST_MODEL_random_forest.joblib"
+    }
+  }
+}
+```
+
+Either place the `models/` bundle in the layout shown under [Installation](#installation),
+or point the matching `*_MODEL_PATH` / `*_DATASET` variable in `.env` at wherever it lives.
+Endpoints needing a missing model return `503 model_unavailable` naming the file and the
+config key — they never fall back to a made-up number.
+
+### The frontend loads but every panel shows an error
+
+The backend is unreachable. Confirm it is running on port 8000, and that
+`VITE_API_BASE_URL` matches if you changed the port. The sidebar shows live backend status.
+
+### Agent narratives say `deterministic_fallback`
+
+The LLM was unavailable, and the reason is in the `note` field. Common causes:
+
+| Cause | Fix |
+|---|---|
+| `GROQ_API_KEY` not set | Add it to `.env` |
+| Rate limit (HTTP 429) | Groq's free tier caps tokens per minute; wait, or use a paid tier |
+| `LLM_ENABLED=false` | Set it to `true` |
+
+The pipeline completes and returns a full analysis either way — only the prose changes.
+
+### `502 upstream_unavailable` from the Building Planner
+
+NASA POWER is unreachable or rate-limiting. The planner deliberately does **not**
+substitute fallback climate values: it skips the rules that needed that data and says
+which. Retry in a few minutes.
+
+### Microplastic upload rejected with "single-channel image"
+
+The model needs all three polarimetric channels (R, A, P). A single reflectance image
+scores at chance level, so it is rejected rather than scored. Use
+`POST /api/microplastics/analyze` with all three, or composite them in R/A/P order.
+
+### `404 grid_not_found` for a location
+
+The coordinates are more than 25 km from any analysed cell — the trained models cover 45
+Indian cities only. `GET /api/grid/cities` lists them.
+
+### `npm run test:e2e` cannot find Chrome
+
+Set `CHROME_PATH` to your Chrome executable. Both servers must also be running.
+
+### Map tiles fail to load
+
+Tiles come from the public OpenStreetMap service, which needs no key but is rate-limited
+and intended for low volume. For real traffic, host your own tiles or use a keyed provider
+(the `TileLayer` URL is in `frontend/src/components/map/GridMap.jsx`).
+
+---
+
+## Data sources
+
+All layers are exported onto the shared 1 km grid. See
+[backend/scripts/download/README.md](backend/scripts/download/README.md) for provenance and
+for how to extend the grid to new cities.
+
+| Dataset | Provider | Used for |
+|---|---|---|
+| Global Surface Water (JRC GSW 1.4) | European Commission JRC | Model 1 target, water features for Model 3 |
+| Global Flood Database (MODIS events) | Cloud to Street / Dartmouth | Model 3 flood labels |
+| GHSL built-up surface | European Commission JRC | Model 2 forward-validation target, Model 3 features |
+| Google Open Buildings (temporal) | Google Research | Building count, height, presence |
+| SRTM digital elevation model | NASA / USGS | Elevation, slope, depression index |
+| CHIRPS rainfall | UCSB Climate Hazards Center | Rainfall climatology |
+| Dynamic World land cover | Google / WRI | Built and tree fractions |
+| Sentinel-2 surface reflectance | ESA Copernicus | NDVI, NDBI spectral indices |
+| HMPD | Hyperspectral MicroPlastic Dataset | Microplastic screening training data |
+| NASA POWER | NASA Langley Research Center | Live solar and meteorological data |
+| OpenStreetMap | OSM contributors | Basemap tiles |
+
+Guideline references: Bureau of Energy Efficiency (Eco-Niwas Samhita), CPHEEO, Bureau of
+Indian Standards (NBC 2016), Ministry of New and Renewable Energy.
+
+**OpenStreetMap road data was deliberately excluded** from Model 2: coverage existed for
+only 3 of the 45 cities, so the feature would have encoded data availability rather than
+accessibility.
 
 ---
 

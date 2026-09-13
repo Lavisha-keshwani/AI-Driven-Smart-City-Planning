@@ -1,0 +1,9 @@
+# The trained model artifacts and their feature tables live here (~6.5 GB) and are
+# distributed alongside the repository rather than committed, so the whole folder
+# is ignored by the root .gitignore.
+#
+# This file is tracked so the directory exists on a fresh clone. See the project
+# README for the expected layout, and run GET /api/models/status to verify it.
+
+*
+!.gitignore
